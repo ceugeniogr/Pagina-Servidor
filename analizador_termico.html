@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analizador de Imágenes Térmicas</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f8fafc;
+      color: #1e293b;
+      margin: 0;
+      padding: 0;
+    }
+    .hidden { display: none !important; }
+
+    .container {
+      max-width: 1200px;
+      margin: auto;
+      padding: 2rem;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    h1 { font-size: 2rem; font-weight: 700; margin: 0; }
+    h2 { font-size: 1.25rem; font-weight: 600; border-bottom: 2px solid #e2e8f0; padding-bottom: .5rem; }
+
+    .card {
+      background: #fff;
+      padding: 1.5rem;
+      border-radius: 1rem;
+      box-shadow: 0 2px 10px rgba(0,0,0,.1);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+    }
+
+    /* Overlay */
+    #loading-overlay {
+      position: fixed; top: 0; left: 0;
+      width: 100%; height: 100%;
+      background-color: rgba(0,0,0,0.6);
+      display: flex; justify-content: center; align-items: center;
+      flex-direction: column; gap: 1rem;
+      color: #fff; z-index: 9999;
+    }
+    .spinner {
+      border: 4px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top: 4px solid #fff;
+      width: 40px; height: 40px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Botones */
+    button {
+      cursor: pointer;
+      border: none;
+      font-weight: 600;
+      border-radius: .5rem;
+      padding: .75rem 1rem;
+      transition: background-color .2s;
+    }
+    #process-btn {
+      width: 100%;
+      background: #2563eb;
+      color: #fff;
+    }
+    #process-btn:hover { background: #1d4ed8; }
+    #process-btn:disabled {
+      background: #cbd5e1;
+      cursor: not-allowed;
+    }
+    .danger-btn {
+      background: #ef4444;
+      color: #fff;
+    }
+    .danger-btn:hover { background: #dc2626; }
+
+    /* File uploader */
+    .file-input-area {
+      border: 2px dashed #cbd5e1;
+      border-radius: .5rem;
+      padding: 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .file-input-area.dragover {
+      border-color: #2563eb;
+      background-color: #eff6ff;
+    }
+
+    /* Results */
+    #results-container, #placeholder-results {
+      min-height: 300px;
+      border: 1px solid #e2e8f0;
+      border-radius: .5rem;
+      padding: 1rem;
+    }
+    #placeholder-results {
+      border: 2px dashed #cbd5e1;
+      text-align: center;
+      color: #64748b;
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      font-size: .9rem;
+      font-weight: 600;
+      padding: .75rem 1rem;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+    }
+    .tab-btn.active {
+      color: #2563eb;
+      border-color: #2563eb;
+    }
+    .tab-btn.inactive {
+      color: #6b7280;
+    }
+
+    img { max-width: 100%; border-radius: .5rem; border: 1px solid #e2e8f0; }
+
+    .download-link {
+      display: block;
+      text-align: center;
+      background: #16a34a;
+      color: #fff;
+      font-weight: 600;
+      padding: .75rem 1rem;
+      border-radius: .5rem;
+      text-decoration: none;
+    }
+    .download-link:hover { background: #15803d; }
+  </style>
+</head>
+<body>
+
+  <!-- Overlay -->
+  <div id="loading-overlay" class="hidden">
+    <div class="spinner"></div>
+    <p>Procesando imagen...</p>
+  </div>
+
+  <div class="container">
+    <header>
+      <h1>Analizador de Imágenes Térmicas</h1>
+      <p>Sube una imagen térmica para analizar las zonas de interés en rostro y manos.</p>
+    </header>
+
+    <div class="card">
+      <div class="grid">
+        <!-- Columna izquierda -->
+        <div>
+          <h2>1. Cargar Imagen</h2>
+          <div id="image-uploader" class="file-input-area">
+            <input type="file" id="file-input" class="hidden" accept="image/jpeg, image/png">
+            <p><strong>Haz clic para subir</strong> o arrastra y suelta</p>
+            <p style="font-size:.85rem;color:#64748b;">PNG, JPG (MAX. 5MB)</p>
+          </div>
+
+          <div id="image-preview-container" class="hidden">
+            <h3>Vista Previa:</h3>
+            <div style="position: relative;">
+              <img id="image-preview" src="#" alt="Vista previa de la imagen">
+              <button id="remove-image-btn" class="danger-btn" style="position:absolute;top:5px;right:5px;padding:.25rem .5rem;border-radius:50%;">X</button>
+            </div>
+          </div>
+
+          <button id="process-btn" disabled>Procesar Imagen</button>
+        </div>
+
+        <!-- Columna derecha -->
+        <div>
+          <h2>2. Resultados del Análisis</h2>
+          <div id="results-container" class="hidden">
+            <div>
+              <button id="tab-face" class="tab-btn active">Análisis de Rostro</button>
+              <button id="tab-hands" class="tab-btn inactive">Análisis de Manos</button>
+            </div>
+            <div id="result-content">
+              <div id="face-result">
+                <img id="face-output-image" src="https://placehold.co/600x400/e2e8f0/94a3b8?text=Resultado+Rostro">
+                <a id="face-pdf-link" href="#" target="_blank" class="download-link">Descargar Informe PDF (Rostro)</a>
+              </div>
+              <div id="hands-result" class="hidden">
+                <img id="hands-output-image" src="https://placehold.co/600x400/e2e8f0/94a3b8?text=Resultado+Manos">
+                <a id="hands-pdf-link" href="#" target="_blank" class="download-link">Descargar Informe PDF (Manos)</a>
+              </div>
+            </div>
+          </div>
+          <div id="placeholder-results">
+            <p><strong>Los resultados del análisis aparecerán aquí.</strong></p>
+            <p>Por favor, carga una imagen y presiona "Procesar".</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const imageUploader = document.getElementById('image-uploader');
+  const fileInput = document.getElementById('file-input');
+  const imagePreviewContainer = document.getElementById('image-preview-container');
+  const imagePreview = document.getElementById('image-preview');
+  const removeImageBtn = document.getElementById('remove-image-btn');
+  const processBtn = document.getElementById('process-btn');
+  const loadingOverlay = document.getElementById('loading-overlay');
+  const resultsContainer = document.getElementById('results-container');
+  const placeholderResults = document.getElementById('placeholder-results');
+  const tabFace = document.getElementById('tab-face');
+  const tabHands = document.getElementById('tab-hands');
+  const faceResult = document.getElementById('face-result');
+  const handsResult = document.getElementById('hands-result');
+
+  let currentFile = null;
+
+  const updateProcessButton = () => { processBtn.disabled = !currentFile; };
+  const resetUI = () => {
+    fileInput.value = '';
+    currentFile = null;
+    imagePreviewContainer.classList.add('hidden');
+    imageUploader.classList.remove('hidden');
+    resultsContainer.classList.add('hidden');
+    placeholderResults.classList.remove('hidden');
+    updateProcessButton();
+  };
+
+  imageUploader.addEventListener('click', () => fileInput.click());
+  ;['dragenter','dragover','dragleave','drop'].forEach(ev =>
+    imageUploader.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }, false)
+  );
+  ;['dragenter','dragover'].forEach(ev =>
+    imageUploader.addEventListener(ev, () => imageUploader.classList.add('dragover'), false)
+  );
+  ;['dragleave','drop'].forEach(ev =>
+    imageUploader.addEventListener(ev, () => imageUploader.classList.remove('dragover'), false)
+  );
+  imageUploader.addEventListener('drop', e => { if (e.dataTransfer.files.length>0) handleFile(e.dataTransfer.files[0]); });
+  fileInput.addEventListener('change', e => { if (e.target.files.length>0) handleFile(e.target.files[0]); });
+
+  const handleFile = (file) => {
+    if (file && file.type.startsWith('image/')) {
+      currentFile = file;
+      const reader = new FileReader();
+      reader.onload = e => {
+        imagePreview.src = e.target.result;
+        imageUploader.classList.add('hidden');
+        imagePreviewContainer.classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+      updateProcessButton();
+    }
+  };
+
+  removeImageBtn.addEventListener('click', resetUI);
+
+  processBtn.addEventListener('click', () => {
+    if (!currentFile) return;
+    loadingOverlay.classList.remove('hidden');
+
+    const formData = new FormData();
+    formData.append('image', currentFile);
+    const serverURL = '/process';
+
+    fetch(serverURL, { method: 'POST', body: formData })
+      .then(response => {
+        if (!response.ok) {
+          return response.json().then(err => { throw new Error(err.details || err.error || 'Ocurrió un error en el servidor.'); });
+        }
+        return response.json();
+      })
+      .then(data => {
+        loadingOverlay.classList.add('hidden');
+        const origin = window.location.origin;
+        document.getElementById('face-output-image').src = origin + data.face_image_url;
+        document.getElementById('face-pdf-link').href = origin + data.face_pdf_url;
+        document.getElementById('hands-output-image').src = origin + data.hands_image_url;
+        document.getElementById('hands-pdf-link').href = origin + data.hands_pdf_url;
+        placeholderResults.classList.add('hidden');
+        resultsContainer.classList.remove('hidden');
+        switchToTab('face');
+      })
+      .catch(error => {
+        loadingOverlay.classList.add('hidden');
+        console.error('Error:', error);
+      });
+  });
+
+  const switchToTab = (tab) => {
+    if (tab === 'face') {
+      tabFace.classList.add('active'); tabFace.classList.remove('inactive');
+      tabHands.classList.add('inactive'); tabHands.classList.remove('active');
+      faceResult.classList.remove('hidden'); handsResult.classList.add('hidden');
+    } else {
+      tabHands.classList.add('active'); tabHands.classList.remove('inactive');
+      tabFace.classList.add('inactive'); tabFace.classList.remove('active');
+      handsResult.classList.remove('hidden'); faceResult.classList.add('hidden');
+    }
+  };
+  tabFace.addEventListener('click', () => switchToTab('face'));
+  tabHands.addEventListener('click', () => switchToTab('hands'));
+});
+</script>
+</body>
+</html>

@@ -1,8 +1,11 @@
-fastapi
-uvicorn
+Flask
+Flask-Cors
 gunicorn
-mediapipe
 opencv-python-headless
+mediapipe==0.10.11
 numpy
-fpdf
+pytesseract
+reportlab
 python-multipart
+fpdf
+regex
